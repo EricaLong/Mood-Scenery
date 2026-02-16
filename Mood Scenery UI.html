@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Emotional UI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      background: #000;
+    }
+
+    /* ── Background image layers ── */
+    .bg-image {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      opacity: 0;
+      transition: opacity 2.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .bg-image.active { opacity: 1; }
+
+    /* ── Blur overlay ── */
+    .blur-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      backdrop-filter: blur(40px) saturate(1.2);
+      -webkit-backdrop-filter: blur(40px) saturate(1.2);
+      background: rgba(0, 0, 0, 0.15);
+      transition: backdrop-filter 2s cubic-bezier(0.4, 0, 0.2, 1),
+                  -webkit-backdrop-filter 2s cubic-bezier(0.4, 0, 0.2, 1),
+                  background 2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .blur-overlay.clear {
+      backdrop-filter: blur(0px) saturate(1.1);
+      -webkit-backdrop-filter: blur(0px) saturate(1.1);
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    /* ── UI layer ── */
+    .ui-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ── Close button ── */
+    .close-btn {
+      position: fixed;
+      top: 24px;
+      right: 28px;
+      z-index: 15;
+      width: 36px;
+      height: 36px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+                  background 0.3s ease,
+                  transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .close-btn.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .close-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .close-btn:active {
+      transform: scale(0.92);
+    }
+
+    .close-btn svg {
+      width: 14px;
+      height: 14px;
+      stroke: rgba(255, 255, 255, 0.6);
+      stroke-width: 1.5;
+      transition: stroke 0.3s ease;
+    }
+
+    .close-btn:hover svg {
+      stroke: rgba(255, 255, 255, 0.9);
+    }
+
+    /* ── Prompt container ── */
+    .prompt-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 40px;
+      width: 927px;
+      max-width: calc(100% - 48px);
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      transition: top 1.4s cubic-bezier(0.22, 1, 0.36, 1),
+                  transform 1.4s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .prompt-container.at-top {
+      top: 40px;
+      transform: translate(-50%, 0);
+    }
+
+    /* ── Heading ── */
+    .heading {
+      font-size: 32px;
+      font-weight: 300;
+      line-height: 1.5;
+      letter-spacing: -0.02em;
+      color: rgba(255, 255, 255, 0.92);
+      text-align: center;
+      width: 100%;
+      transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .heading.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* ── Input area ── */
+    .input-area {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 36px;
+      width: 100%;
+    }
+
+    .input-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      width: 520px;
+      max-width: 100%;
+      cursor: text;
+      position: relative;
+    }
+
+    .mood-input {
+      width: 100%;
+      border: none;
+      outline: none;
+      background: transparent;
+      font-family: 'Inter', sans-serif;
+      font-size: 24px;
+      font-weight: 300;
+      line-height: 48px;
+      letter-spacing: -0.01em;
+      text-align: center;
+      color: #fff;
+      caret-color: rgba(255, 255, 255, 0.6);
+      transition: font-size 1s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .mood-input::placeholder {
+      color: rgba(255, 255, 255, 0.3);
+      font-weight: 300;
+    }
+
+    .prompt-container.at-top .mood-input {
+      font-size: 16px;
+      font-weight: 400;
+    }
+
+    /* ── Meteor underline ── */
+    .input-underline {
+      width: 100%;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.12);
+      position: relative;
+      overflow: hidden;
+      transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .input-underline::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -40%;
+      width: 40%;
+      height: 100%;
+      background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.1) 20%,
+        rgba(255, 255, 255, 0.8) 60%,
+        rgba(255, 255, 255, 1) 80%,
+        transparent 100%
+      );
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+
+    .input-wrap.focused .input-underline::after {
+      opacity: 1;
+      animation: meteor 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+
+    @keyframes meteor {
+      0%   { left: -40%; }
+      100% { left: 110%; }
+    }
+
+    /* ── Display mode: input looks like static text ── */
+    .input-wrap.display-mode .input-underline {
+      opacity: 0;
+    }
+
+    .input-wrap.display-mode .mood-input {
+      cursor: pointer;
+      color: rgba(255, 255, 255, 0.88);
+    }
+
+    .input-wrap.display-mode .mood-input:hover {
+      color: #fff;
+    }
+
+    /* ── Glass pills ── */
+    .pills {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      width: 100%;
+      transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+                  transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .pills.hidden {
+      opacity: 0;
+      transform: translateY(12px);
+      pointer-events: none;
+    }
+
+    .pill {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 20px;
+      height: 48px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 100px;
+      background: rgba(255, 255, 255, 0.06);
+      backdrop-filter: blur(12px) saturate(1.4);
+      -webkit-backdrop-filter: blur(12px) saturate(1.4);
+      cursor: pointer;
+      color: #fff;
+      font-family: inherit;
+      transition: background 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                  border-color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                  transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+                  box-shadow 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      -webkit-tap-highlight-color: transparent;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .pill:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.3);
+      box-shadow: 0 4px 24px rgba(255, 255, 255, 0.06);
+    }
+
+    .pill:active {
+      transform: scale(0.96);
+    }
+
+    .pill-emoji {
+      font-size: 20px;
+      line-height: 1;
+      display: inline-block;
+      transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .pill:hover .pill-emoji {
+      transform: rotate(-12deg) scale(1.15);
+    }
+
+    .pill-text {
+      font-size: 13px;
+      font-weight: 400;
+      letter-spacing: 0.01em;
+      line-height: 48px;
+      white-space: nowrap;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .pill:hover .pill-text {
+      color: #fff;
+    }
+
+    /* ── Credit ── */
+    .credit {
+      position: fixed;
+      bottom: 24px;
+      right: 32px;
+      font-size: 10px;
+      font-weight: 300;
+      letter-spacing: 0.06em;
+      color: rgba(255, 255, 255, 0.18);
+      z-index: 11;
+    }
+
+    .credit a {
+      color: rgba(255, 255, 255, 0.18);
+      text-decoration: none;
+      transition: color 0.3s ease;
+    }
+
+    .credit a:hover {
+      color: rgba(255, 255, 255, 0.4);
+    }
+
+    /* ── Loading bar ── */
+    .loading-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+      z-index: 20;
+      transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s ease;
+      opacity: 0;
+    }
+
+    .loading-bar.active {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Background image layers for crossfade -->
+<div class="bg-image active" id="bgA" style="background-image:url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920&q=80&fit=crop')"></div>
+<div class="bg-image" id="bgB"></div>
+
+<!-- Blur overlay -->
+<div class="blur-overlay" id="blurOverlay"></div>
+
+<!-- Loading bar -->
+<div class="loading-bar" id="loadingBar"></div>
+
+<!-- Close button -->
+<button class="close-btn" id="closeBtn" aria-label="Return to start">
+  <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+  </svg>
+</button>
+
+<!-- UI -->
+<div class="ui-layer">
+  <div class="prompt-container" id="promptContainer">
+    <!-- Heading -->
+    <h1 class="heading" id="heading">How are you feeling today?</h1>
+
+    <!-- Input area -->
+    <div class="input-area" id="inputArea">
+      <!-- Single input: toggles between display and edit mode -->
+      <div class="input-wrap" id="inputWrap">
+        <input class="mood-input" id="moodInput" type="text" placeholder="Peaceful and quiet, warm and nostalgic, light and playful..." autocomplete="off" spellcheck="false">
+        <div class="input-underline"></div>
+      </div>
+
+      <!-- Prompt pills (dynamically generated) -->
+      <div class="pills" id="pills"></div>
+    </div>
+  </div>
+</div>
+
+<div class="credit">Photos by <a href="https://unsplash.com" target="_blank" rel="noopener">Unsplash</a></div>
+
+<script>
+  // ── Default placeholder text ──
+  const defaultPlaceholder = 'Peaceful and quiet, warm and nostalgic, light and playful...';
+  const defaultBgUrl = 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920&q=80&fit=crop';
+
+  // ── Curated image pools — each ID is unique, no duplicates across categories ──
+  // Every Unsplash photo-ID appears at most ONCE in the entire map.
+  const moodImageIds = {
+    'quiet': [
+      'photo-1470071459604-3b5ec3a7fe05', // misty green valley
+      'photo-1500382017468-9049fed747ef', // golden field at dawn
+      'photo-1504700610630-ac6edd918aa0', // lone chair by window
+      'photo-1497449493169-bcc189ac30cb', // foggy pier
+      'photo-1485201543483-f06c8d2a8fb4', // still lake reflection
+    ],
+    'longing': [
+      'photo-1516339901601-2e1b62dc0c45', // empty road stretching
+      'photo-1502481851512-e9e2529bfbf9', // distant horizon field
+      'photo-1504567961542-e24d9439a724', // solitary tree on hill
+      'photo-1464822759023-fed622ff2c3b', // mountain peak in clouds
+      'photo-1476820865390-c52aeebb9891', // foggy forest path
+    ],
+    'warm': [
+      'photo-1495616811223-4d98c6e9c869', // golden hour coast
+      'photo-1474524955719-b9f87c50ce47', // warm sunset field
+      'photo-1518837695005-2083093ee35b', // soft ocean sunset
+      'photo-1419242902214-272b3f66ee7a', // warm fireplace glow
+      'photo-1508739773434-c26b3d09e071', // amber sunset sky
+    ],
+    'nostalgia': [
+      'photo-1472120435266-95a3f747eb08', // vintage café window
+      'photo-1503803548695-c2a7b4a5b875', // retro sunset pier
+      'photo-1501436513145-30f24e19fbd8', // old town street
+      'photo-1517760444937-f6397edcbbcd', // dusty film grain road
+      'photo-1496483648148-47c686dc86a8', // autumn village lane
+    ],
+    'calm': [
+      'photo-1506905925346-21bda4d32df4', // alpine lake
+      'photo-1507525428034-b723cf961d3e', // tropical beach
+      'photo-1439853949127-fa647821eba0', // calm seaside
+      'photo-1501785888041-af3ef285b470', // green valley panorama
+      'photo-1470252649378-9c29740c9fa8', // soft sunrise hills
+    ],
+    'clarity': [
+      'photo-1454496522488-7a8e488e8606', // crystal clear lake
+      'photo-1489447068241-b3490214e879', // bright sky over water
+      'photo-1505228395891-9a51e7e86bf6', // blue sky minimalist
+      'photo-1531366936337-7c912a4589a7', // clean arctic landscape
+      'photo-1484591974057-265bb767ef71', // clear sky horizon
+    ],
+    'electric': [
+      'photo-1470229722913-7c0e2dbbafd3', // concert crowd lights
+      'photo-1514525253161-7a46d19cd819', // neon party lights
+      'photo-1492684223066-81342ee5ff30', // festival fireworks
+      'photo-1504680177321-2e6a879aac86', // lightning strike
+      'photo-1517999144091-3d9dca6d1e43', // electric city night
+    ],
+    'anticipation': [
+      'photo-1533174072545-7a4b6ad7a6c3', // stage lights glow
+      'photo-1429962714451-bb934ecdc4ec', // crowd at sunrise
+      'photo-1459749411175-04bf5292ceea', // dawn breaking over city
+      'photo-1506157786151-b8491531f063', // runway lights at dusk
+      'photo-1496715976403-7e36dc43f17b', // horizon before storm
+    ],
+    'romance': [
+      'photo-1490750967868-88aa4f44baee', // pink soft petals
+      'photo-1518199266791-5375a83190b7', // roses soft light
+      'photo-1455659817273-f96807779a8a', // sunset couple silhouette
+      'photo-1516589178581-6cd7833ae3b2', // delicate flower close
+      'photo-1494783367193-149034c05e8f', // romantic golden field
+    ],
+    'soft': [
+      'photo-1517483000871-1dbf64a6e1c6', // soft linen texture
+      'photo-1526662092594-e98c1e356d6a', // soft cloud formations
+      'photo-1491841573634-28140fc7eedc', // gentle morning fog
+      'photo-1507003211169-0a1dd7228f2d', // soft forest light
+    ],
+    'rain': [
+      'photo-1515694346937-94d85e41e6f0', // rain on window
+      'photo-1534088568595-a066f410bcda', // moody rainy street
+      'photo-1428592953211-077571b65132', // rainy city lights
+      'photo-1501691223387-dd0506c89ac8', // rain on leaves
+      'photo-1438449805896-28a666819a20', // puddle reflections
+    ],
+    'sad': [
+      'photo-1501999635878-71cb5379c2d8', // grey ocean shore
+      'photo-1428908728789-d2de25dbd4e2', // overcast empty field
+      'photo-1486848538113-ce1a4923fbc5', // lonely dock in mist
+      'photo-1499346030926-9a72daac6c63', // cloudy mountain pass
+    ],
+    'happy': [
+      'photo-1433086966358-54859d0ed716', // bright waterfall forest
+      'photo-1494500764479-0c8f2919a3d8', // sunlit forest canopy
+      'photo-1504198453319-5ce911bafcde', // golden wildflower meadow
+      'photo-1523712999610-f77fbcfc3843', // joyful sunset beach
+    ],
+    'sunset': [
+      'photo-1507400492013-162706c8c05e', // dramatic sunset clouds
+      'photo-1476842634003-7dcca8f832de', // purple orange sky
+      'photo-1495567720155-e167d22e2013', // ocean horizon sunset
+      'photo-1490682143684-14369e18dce8', // golden bridge sunset
+    ],
+    'forest': [
+      'photo-1448375240586-882707db888b', // deep green forest
+      'photo-1476231682828-37e571bc172f', // forest sunbeams
+      'photo-1441974231531-c6227db76b6e', // lush woodland path
+      'photo-1473448912268-2022ce9509d8', // mossy old-growth
+      'photo-1425913397330-cf8af2ff40a1', // enchanted forest stream
+    ],
+    'ocean': [
+      'photo-1505118380757-91f5f5632de0', // deep blue sea
+      'photo-1471922694854-ff1b63b20054', // coastal waves
+      'photo-1505142468610-359e7d316be0', // turquoise water
+      'photo-1484291470158-b8f8d608850d', // aerial ocean view
+      'photo-1518020382113-a7e8fc38eac9', // underwater light rays
+    ],
+    'night': [
+      'photo-1475274047050-1d0c55b91082', // starry sky
+      'photo-1444080748397-f442aa95c3e5', // cosmic aurora
+      'photo-1507400492013-162706c8c05e', // deep night scene
+      'photo-1419242902214-272b3f66ee7a', // moonlit landscape
+      'photo-1536746803623-cef87080bfc8', // milky way panorama
+    ],
+    'snow': [
+      'photo-1491002052546-bf38f186af56', // snow-capped peaks
+      'photo-1477601263568-180e2c6d046e', // winter wonderland
+      'photo-1457269449834-928af64c7dd4', // snowy forest
+      'photo-1482003297000-b7f1a840512e', // frosted branches
+      'photo-1478265409131-1f65c88f965c', // snow drifts at dawn
+    ],
+    'energetic': [
+      'photo-1551524164-687a55dd1126', // vibrant city rush
+      'photo-1461988320302-91bde64fc8e4', // colourful splash
+      'photo-1485871981521-5b1fd3805eee', // fireworks burst
+      'photo-1540959733332-eab4deabeeaf', // tokyo neon streets
+    ],
+    'moody': [
+      'photo-1468276311594-df7cb65d8df6', // brooding storm sky
+      'photo-1499346030926-9a72daac6c63', // dramatic cliff face
+      'photo-1446034295857-c899f4c4a141', // moody dark sea
+    ],
+    'desert': [
+      'photo-1509316785289-025f5b846b35', // vast sand dunes
+      'photo-1473580044384-7ba9967e16a0', // desert sunset
+      'photo-1504618223053-559bdef9dd5a', // arid canyon
+      'photo-1509023464722-18d996393ca8', // desert starscape
+    ],
+    'chill': [
+      'photo-1506126613408-eca07ce68773', // zen water stones
+      'photo-1499002238440-d264edd596ec', // calm infinity pool
+      'photo-1528360983277-13d401cdc186', // peaceful hammock
+    ],
+    'dreamy': [
+      'photo-1534447677768-be436bb09401', // ethereal clouds
+      'photo-1516912481808-3406841bd33c', // dreamy lavender field
+      'photo-1490604001847-b712b0c2f967', // soft pastel sky
+      'photo-1509909756405-be0199881695', // misty dreamscape
+    ],
+    'cozy': [
+      'photo-1513694203232-719a280e022f', // warm reading nook
+      'photo-1515518679833-bd8f5bd04c04', // cabin in snow
+      'photo-1543002588-bfa74002ed7e', // autumn blanket scene
+    ],
+    'passion': [
+      'photo-1518710843675-2540dd808232', // dancing flames
+      'photo-1485470733090-0aae1788d668', // deep red canyon
+      'photo-1474313438662-85ce389c174a', // volcanic glow
+    ],
+    'solitude': [
+      'photo-1504567961542-e24d9439a724', // lone tree hilltop
+      'photo-1504618223053-559bdef9dd5a', // vast empty desert
+      'photo-1483728642387-6c3bdd6c93e5', // remote cabin
+    ],
+    'wonder': [
+      'photo-1462275646964-a0e3c11f18a6', // northern lights
+      'photo-1465189684280-6a8fa9b19a7a', // starlit canyon
+      'photo-1531366936337-7c912a4589a7', // ice cave blue
+    ],
+    'hope': [
+      'photo-1470252649378-9c29740c9fa8', // sunrise breaking
+      'photo-1504198453319-5ce911bafcde', // golden light meadow
+      'photo-1494500764479-0c8f2919a3d8', // light through trees
+    ],
+    'autumn': [
+      'photo-1507003211169-0a1dd7228f2d', // autumn foliage
+      'photo-1496483648148-47c686dc86a8', // fall colours lane
+      'photo-1476820865390-c52aeebb9891', // misty autumn path
+    ],
+    'festive': [
+      'photo-1485871981521-5b1fd3805eee', // celebration lights
+      'photo-1467810563316-b5476525c0f9', // colourful lanterns
+      'photo-1540959733332-eab4deabeeaf', // vibrant night city
+    ],
+    'storm': [
+      'photo-1504680177321-2e6a879aac86', // lightning bolt
+      'photo-1468276311594-df7cb65d8df6', // storm front rolling
+      'photo-1446034295857-c899f4c4a141', // dark churning sea
+    ],
+    'music': [
+      'photo-1511671782779-c97d3d27a1d4', // guitar close up
+      'photo-1493225457124-a3eb161ffa5f', // concert atmosphere
+      'photo-1459749411175-04bf5292ceea', // stage ambient lights
+    ],
+    'blossom': [
+      'photo-1522748906645-95d8adfd52c7', // cherry blossoms
+      'photo-1490750967868-88aa4f44baee', // pink bloom garden
+      'photo-1462275646964-a0e3c11f18a6', // flower field aurora
+    ],
+    'freedom': [
+      'photo-1433086966358-54859d0ed716', // wide open waterfall
+      'photo-1469474968028-56623f02e42e', // bird's eye valley
+      'photo-1454391304352-2bf4678b1a7a', // open road vista
+    ],
+    'mountain': [
+      'photo-1464822759023-fed622ff2c3b', // majestic peak
+      'photo-1454496522488-7a8e488e8606', // crystal lake and peaks
+      'photo-1486870591958-9b9d0d1dda99', // mountain ridge line
+    ],
+    'tender': [
+      'photo-1516589178581-6cd7833ae3b2', // delicate bloom
+      'photo-1494783367193-149034c05e8f', // golden wheat at sunset
+      'photo-1522748906645-95d8adfd52c7', // gentle spring petals
+    ],
+    'pastoral': [
+      'photo-1500382017468-9049fed747ef', // rolling fields
+      'photo-1504567961542-e24d9439a724', // countryside hills
+      'photo-1502481851512-e9e2529bfbf9', // farmland horizon
+    ],
+    'cosmic': [
+      'photo-1536746803623-cef87080bfc8', // milky way
+      'photo-1444080748397-f442aa95c3e5', // northern lights
+      'photo-1465189684280-6a8fa9b19a7a', // starry desert sky
+    ],
+    'wild': [
+      'photo-1504680177321-2e6a879aac86', // fierce lightning
+      'photo-1518710843675-2540dd808232', // raging fire
+      'photo-1474313438662-85ce389c174a', // volcanic eruption
+    ],
+    'still': [
+      'photo-1485201543483-f06c8d2a8fb4', // still water mirror
+      'photo-1497449493169-bcc189ac30cb', // quiet foggy pier
+      'photo-1506126613408-eca07ce68773', // zen meditation stones
+    ],
+    'playful': [
+      'photo-1523712999610-f77fbcfc3843', // playful beach sunset
+      'photo-1504198453319-5ce911bafcde', // golden meadow light
+      'photo-1469474968028-56623f02e42e', // expansive landscape
+    ],
+    'peaceful': [
+      'photo-1489447068241-b3490214e879', // still water dawn
+      'photo-1484591974057-265bb767ef71', // horizon serenity
+      'photo-1505228395891-9a51e7e86bf6', // blue minimal sky
+    ],
+    'light': [
+      'photo-1491841573634-28140fc7eedc', // morning light fog
+      'photo-1526662092594-e98c1e356d6a', // cloud formations
+      'photo-1534447677768-be436bb09401', // ethereal light
+    ],
+  };
+
+  // Fallback IDs for unmatched moods
+  const fallbackIds = [
+    'photo-1470071459604-3b5ec3a7fe05',
+    'photo-1506905925346-21bda4d32df4',
+    'photo-1507525428034-b723cf961d3e',
+    'photo-1501785888041-af3ef285b470',
+    'photo-1439853949127-fa647821eba0',
+    'photo-1433086966358-54859d0ed716',
+    'photo-1470252649378-9c29740c9fa8',
+    'photo-1454496522488-7a8e488e8606',
+  ];
+
+  // Track used images to avoid repetition
+  const usedImages = new Set();
+
+  function buildImageUrl(photoId) {
+    return `https://images.unsplash.com/${photoId}?w=1920&q=80&fit=crop`;
+  }
+
+  // ── Elements ──
+  const promptContainer = document.getElementById('promptContainer');
+  const heading = document.getElementById('heading');
+  const moodInput = document.getElementById('moodInput');
+  const inputWrap = document.getElementById('inputWrap');
+  const pillsContainer = document.getElementById('pills');
+  const blurOverlay = document.getElementById('blurOverlay');
+  const bgA = document.getElementById('bgA');
+  const bgB = document.getElementById('bgB');
+  const loadingBar = document.getElementById('loadingBar');
+  const closeBtn = document.getElementById('closeBtn');
+
+  let activeBg = 'A';
+  let currentState = 'entry';
+  let currentMood = '';
+  let hasTriggeredOnce = false;
+  let isDisplayMode = false;
+
+  // ── Focus tracking for meteor animation ──
+  moodInput.addEventListener('focus', () => {
+    inputWrap.classList.add('focused');
+    if (isDisplayMode) {
+      enterEditing();
+    }
+  });
+  moodInput.addEventListener('blur', () => inputWrap.classList.remove('focused'));
+
+  // ── Dynamic mood pool ──
+  const moodPool = [
+    { emoji: '🍃', mood: 'Quiet Longing' },
+    { emoji: '🌆', mood: 'Warm Nostalgia' },
+    { emoji: '🏞️', mood: 'Calm Clarity' },
+    { emoji: '😁', mood: 'Electric Anticipation' },
+    { emoji: '🥰', mood: 'Soft Romance' },
+    { emoji: '🌧️', mood: 'Rainy Melancholy' },
+    { emoji: '🌅', mood: 'Golden Sunset' },
+    { emoji: '🌊', mood: 'Ocean Serenity' },
+    { emoji: '✨', mood: 'Starlit Wonder' },
+    { emoji: '🌸', mood: 'Cherry Blossom Peace' },
+    { emoji: '🔥', mood: 'Fiery Passion' },
+    { emoji: '🌙', mood: 'Midnight Stillness' },
+    { emoji: '🎶', mood: 'Musical Bliss' },
+    { emoji: '🍂', mood: 'Autumn Reflection' },
+    { emoji: '❄️', mood: 'Winter Silence' },
+    { emoji: '🌿', mood: 'Forest Tranquility' },
+    { emoji: '💫', mood: 'Dreamy Wanderlust' },
+    { emoji: '🌻', mood: 'Sunny Optimism' },
+    { emoji: '🎆', mood: 'Festive Energy' },
+    { emoji: '🕊️', mood: 'Gentle Hope' },
+    { emoji: '🌌', mood: 'Cosmic Solitude' },
+    { emoji: '☕', mood: 'Cozy Comfort' },
+    { emoji: '🦋', mood: 'Playful Freedom' },
+    { emoji: '🎭', mood: 'Bittersweet Joy' },
+    { emoji: '🏔️', mood: 'Mountain Grandeur' },
+    { emoji: '💜', mood: 'Soft Tenderness' },
+    { emoji: '⛈️', mood: 'Stormy Intensity' },
+    { emoji: '🌾', mood: 'Pastoral Calm' },
+    { emoji: '🎪', mood: 'Wild Excitement' },
+    { emoji: '🪷', mood: 'Inner Stillness' },
+  ];
+
+  function shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function generatePills() {
+    const picked = shuffle(moodPool).slice(0, 5);
+    pillsContainer.innerHTML = picked.map(p =>
+      `<button class="pill" data-mood="${p.mood}">
+        <span class="pill-emoji">${p.emoji}</span>
+        <span class="pill-text">${p.mood}</span>
+      </button>`
+    ).join('');
+  }
+
+  generatePills();
+
+  // ── Preload image ──
+  function preloadImage(url) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(url);
+      img.onerror = () => resolve(url);
+      img.src = url;
+    });
+  }
+
+  // ── Get image for mood — collects ALL matching IDs, filters out used, picks random ──
+  function getImageForMood(mood) {
+    const key = mood.toLowerCase().trim();
+    const words = key.split(/\s+/).filter(w => w.length >= 3);
+    let candidates = [];
+
+    // Collect from all matching categories (exact, partial, and word matches)
+    for (const [category, ids] of Object.entries(moodImageIds)) {
+      const isMatch =
+        category === key ||
+        category.includes(key) || key.includes(category) ||
+        words.some(w => category.includes(w));
+
+      if (isMatch) {
+        for (const id of ids) {
+          if (!candidates.includes(id)) candidates.push(id);
+        }
+      }
+    }
+
+    // Fall back to fallback pool if no matches
+    if (candidates.length === 0) {
+      candidates = [...fallbackIds];
+    }
+
+    // Filter out already-used images
+    let fresh = candidates.filter(id => !usedImages.has(id));
+
+    // If all candidates exhausted, clear history for this set and reuse
+    if (fresh.length === 0) {
+      candidates.forEach(id => usedImages.delete(id));
+      fresh = [...candidates];
+    }
+
+    // Pick random from fresh pool
+    const chosen = fresh[Math.floor(Math.random() * fresh.length)];
+    usedImages.add(chosen);
+
+    return buildImageUrl(chosen);
+  }
+
+  // ── Loading bar ──
+  function showLoading() {
+    loadingBar.style.transition = 'none';
+    loadingBar.style.width = '0';
+    loadingBar.classList.add('active');
+    void loadingBar.offsetWidth;
+    loadingBar.style.transition = 'width 1.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s ease';
+    loadingBar.style.width = '70%';
+  }
+
+  function hideLoading() {
+    loadingBar.style.width = '100%';
+    setTimeout(() => loadingBar.classList.remove('active'), 400);
+  }
+
+  // ── Trigger mood ──
+  async function triggerMood(mood) {
+    if (!mood.trim()) return;
+
+    currentMood = mood.trim();
+    currentState = 'clear';
+    hasTriggeredOnce = true;
+
+    showLoading();
+
+    const imgUrl = getImageForMood(currentMood);
+    await preloadImage(imgUrl);
+
+    hideLoading();
+
+    // Crossfade
+    const incoming = activeBg === 'A' ? bgB : bgA;
+    const outgoing = activeBg === 'A' ? bgA : bgB;
+
+    incoming.style.backgroundImage = `url(${imgUrl})`;
+    void incoming.offsetWidth;
+    incoming.classList.add('active');
+    outgoing.classList.remove('active');
+    activeBg = activeBg === 'A' ? 'B' : 'A';
+
+    // Clear blur
+    blurOverlay.classList.add('clear');
+
+    // Move to top
+    promptContainer.classList.add('at-top');
+    heading.classList.add('hidden');
+    pillsContainer.classList.add('hidden');
+
+    // Switch input to display mode
+    isDisplayMode = true;
+    moodInput.value = currentMood;
+    moodInput.readOnly = true;
+    moodInput.placeholder = '';
+    inputWrap.classList.add('display-mode');
+    moodInput.blur();
+
+    // Show close button
+    closeBtn.classList.add('visible');
+  }
+
+  // ── Enter editing ──
+  function enterEditing() {
+    currentState = 'editing';
+    isDisplayMode = false;
+
+    // Blur background
+    blurOverlay.classList.remove('clear');
+
+    // Keep at top after first trigger
+    if (hasTriggeredOnce) {
+      promptContainer.classList.add('at-top');
+      heading.classList.add('hidden');
+    } else {
+      promptContainer.classList.remove('at-top');
+      heading.classList.remove('hidden');
+    }
+
+    // Switch input to editable
+    moodInput.readOnly = false;
+    moodInput.placeholder = defaultPlaceholder;
+    inputWrap.classList.remove('display-mode');
+
+    // Regenerate pills
+    generatePills();
+    pillsContainer.classList.remove('hidden');
+
+    // Pre-fill and select
+    moodInput.value = currentMood;
+
+    setTimeout(() => {
+      moodInput.focus();
+      moodInput.select();
+    }, 50);
+  }
+
+  // ── Reset to initial state ──
+  function resetToDefault() {
+    currentState = 'entry';
+    currentMood = '';
+    hasTriggeredOnce = false;
+    isDisplayMode = false;
+    usedImages.clear();
+
+    // Hide close button
+    closeBtn.classList.remove('visible');
+
+    // Restore blur
+    blurOverlay.classList.remove('clear');
+
+    // Move prompt back to center
+    promptContainer.classList.remove('at-top');
+
+    // Show heading
+    heading.classList.remove('hidden');
+
+    // Reset input
+    moodInput.readOnly = false;
+    moodInput.value = '';
+    moodInput.placeholder = defaultPlaceholder;
+    inputWrap.classList.remove('display-mode');
+
+    // Regenerate and show pills
+    generatePills();
+    pillsContainer.classList.remove('hidden');
+
+    // Crossfade back to default image
+    const incoming = activeBg === 'A' ? bgB : bgA;
+    const outgoing = activeBg === 'A' ? bgA : bgB;
+
+    incoming.style.backgroundImage = `url(${defaultBgUrl})`;
+    void incoming.offsetWidth;
+    incoming.classList.add('active');
+    outgoing.classList.remove('active');
+    activeBg = activeBg === 'A' ? 'B' : 'A';
+
+    // Focus input after transition
+    setTimeout(() => moodInput.focus(), 600);
+  }
+
+  // ── Events ──
+  moodInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && moodInput.value.trim()) {
+      triggerMood(moodInput.value.trim());
+      moodInput.blur();
+    }
+  });
+
+  closeBtn.addEventListener('click', () => resetToDefault());
+
+  pillsContainer.addEventListener('click', (e) => {
+    const pill = e.target.closest('.pill');
+    if (!pill) return;
+    const mood = pill.dataset.mood;
+    moodInput.value = mood;
+    triggerMood(mood);
+  });
+
+  // Focus on load
+  setTimeout(() => moodInput.focus(), 600);
+</script>
+
+</body>
+</html>
