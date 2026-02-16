@@ -11,7 +11,7 @@ As a Senior Product Designer, I acted as the Creative Director and Architect for
 
 Logic Mapping: Defined the "State Machine" transitions (scale, blur, and position) to ensure spatial consistency.
 
-API Orchestration: Directed the integration of the Unsplash API to ensure dynamic, high-quality, and non-repetitive content delivery.
+API Orchestration: Directed the integration of the Pexels API to ensure dynamic, high-quality video backgrounds that match the user's mood.
 
 Iterative Refinement: Used natural language to fine-tune micro-interactions, such as the 1.5s ease-in-out transitions and the "tilt" hover effects on UI elements.
 
