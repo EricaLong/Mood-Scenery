@@ -177,7 +177,7 @@
       outline: none;
       background: transparent;
       font-family: 'Inter', sans-serif;
-      font-size: 24px;
+      font-size: 20px;
       font-weight: 300;
       line-height: 48px;
       letter-spacing: -0.01em;
@@ -393,7 +393,7 @@
     <div class="input-area" id="inputArea">
       <!-- Single input: toggles between display and edit mode -->
       <div class="input-wrap" id="inputWrap">
-        <input class="mood-input" id="moodInput" type="text" placeholder="Peaceful and quiet, warm and nostalgic, light and playful..." autocomplete="off" spellcheck="false">
+        <input class="mood-input" id="moodInput" type="text" placeholder="Calm, cozy, free…" autocomplete="off" spellcheck="false">
         <div class="input-underline"></div>
       </div>
 
@@ -407,7 +407,7 @@
 
 <script>
   // ── Default placeholder text ──
-  const defaultPlaceholder = 'Peaceful and quiet, warm and nostalgic, light and playful...';
+  const defaultPlaceholder = 'Calm, cozy, free…';
   const defaultBgUrl = 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920&q=80&fit=crop';
 
   // ── Curated image pools — each ID is unique, no duplicates across categories ──
@@ -708,8 +708,26 @@
     if (isDisplayMode) {
       enterEditing();
     }
+    // Set cursor position to the beginning
+    setTimeout(() => {
+      moodInput.setSelectionRange(0, 0);
+    }, 0);
   });
   moodInput.addEventListener('blur', () => inputWrap.classList.remove('focused'));
+
+  // Keep cursor at start when input is empty (placeholder visible)
+  moodInput.addEventListener('click', () => {
+    if (moodInput.value.length === 0) {
+      moodInput.setSelectionRange(0, 0);
+    }
+  });
+  moodInput.addEventListener('mousedown', (e) => {
+    if (moodInput.value.length === 0) {
+      e.preventDefault();
+      moodInput.focus();
+      moodInput.setSelectionRange(0, 0);
+    }
+  });
 
   // ── Dynamic mood pool ──
   const moodPool = [
@@ -953,7 +971,10 @@
     activeBg = activeBg === 'A' ? 'B' : 'A';
 
     // Focus input after transition
-    setTimeout(() => moodInput.focus(), 600);
+    setTimeout(() => {
+      moodInput.focus();
+      moodInput.setSelectionRange(0, 0);
+    }, 600);
   }
 
   // ── Events ──
@@ -975,7 +996,10 @@
   });
 
   // Focus on load
-  setTimeout(() => moodInput.focus(), 600);
+  setTimeout(() => {
+    moodInput.focus();
+    moodInput.setSelectionRange(0, 0);
+  }, 600);
 </script>
 
 </body>
