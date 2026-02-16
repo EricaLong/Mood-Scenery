@@ -1,5 +1,5 @@
 # 🏞️ Mood Scenery
-A sensory "Oracle" that transforms human emotion into immersive digital atmospheres.
+A sensory "Oracle" that transforms human emotion into immersive digital atmospheres. Type a mood or pick one—background videos from [Pexels](https://www.pexels.com) update to match.
 
 ### 📋 **Project Overview** 
 

@@ -20,19 +20,26 @@
       background: #000;
     }
 
-    /* ── Background image layers ── */
-    .bg-image {
+    /* ── Background video (covers viewport, matches aspect by cropping) ── */
+    .bg-video-wrap {
       position: fixed;
       inset: 0;
       z-index: 1;
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-      opacity: 0;
-      transition: opacity 2.2s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow: hidden;
     }
 
-    .bg-image.active { opacity: 1; }
+    #bg-video {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      min-width: 100%;
+      min-height: 100%;
+      width: auto;
+      height: auto;
+      transform: translate(-50%, -50%);
+      object-fit: cover;
+      transition: opacity 2.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
 
     /* ── Blur overlay ── */
     .blur-overlay {
@@ -366,9 +373,10 @@
 </head>
 <body>
 
-<!-- Background image layers for crossfade -->
-<div class="bg-image active" id="bgA" style="background-image:url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920&q=80&fit=crop')"></div>
-<div class="bg-image" id="bgB"></div>
+<!-- Background video -->
+<div class="bg-video-wrap">
+  <video id="bg-video" autoplay muted loop playsinline></video>
+</div>
 
 <!-- Blur overlay -->
 <div class="blur-overlay" id="blurOverlay"></div>
@@ -403,16 +411,22 @@
   </div>
 </div>
 
-<div class="credit">Photos by <a href="https://unsplash.com" target="_blank" rel="noopener">Unsplash</a></div>
+<div class="credit">Videos from <a href="https://www.pexels.com" target="_blank" rel="noopener">Pexels</a></div>
 
 <script>
   // ── Default placeholder text ──
   const defaultPlaceholder = 'Calm, cozy, free…';
-  const defaultBgUrl = 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920&q=80&fit=crop';
 
-  // ── Curated image pools — each ID is unique, no duplicates across categories ──
-  // Every Unsplash photo-ID appears at most ONCE in the entire map.
-  const moodImageIds = {
+  // ── Pexels API (get a free key at https://www.pexels.com/api) ──
+  const PEXELS_API_KEY = 'CEvAF2LZYUCe3YBUGlnsL1SPVx2wJLC36eLAU2YyoHwIudwf5U6MmsmB';
+
+  const PEXELS_VIDEOS_SEARCH = 'https://api.pexels.com/videos/search';
+
+  // Fallback search if mood returns no results
+  const DEFAULT_VIDEO_QUERY = 'calm nature';
+
+  // ── Legacy moodImageIds kept only for reference; not used for video ──
+  const _moodImageIds = {
     'quiet': [
       'photo-1470071459604-3b5ec3a7fe05', // misty green valley
       'photo-1500382017468-9049fed747ef', // golden field at dawn
@@ -665,23 +679,44 @@
     ],
   };
 
-  // Fallback IDs for unmatched moods
-  const fallbackIds = [
-    'photo-1470071459604-3b5ec3a7fe05',
-    'photo-1506905925346-21bda4d32df4',
-    'photo-1507525428034-b723cf961d3e',
-    'photo-1501785888041-af3ef285b470',
-    'photo-1439853949127-fa647821eba0',
-    'photo-1433086966358-54859d0ed716',
-    'photo-1470252649378-9c29740c9fa8',
-    'photo-1454496522488-7a8e488e8606',
-  ];
+  // ── Pexels: fetch videos and pick best file for background (landscape, HD when possible) ──
+  async function fetchPexelsVideos(query) {
+    const url = `${PEXELS_VIDEOS_SEARCH}?query=${encodeURIComponent(query)}&per_page=15`;
+    const res = await fetch(url, { headers: { Authorization: PEXELS_API_KEY } });
+    if (!res.ok) throw new Error('Pexels request failed');
+    const data = await res.json();
+    return data.videos || [];
+  }
 
-  // Track used images to avoid repetition
-  const usedImages = new Set();
+  function pickBestVideoFile(video) {
+    const files = video.video_files || [];
+    const landscape = files.filter(f => f.width >= f.height && f.width >= 1280);
+    const pool = landscape.length ? landscape : files;
+    const byWidth = [...pool].sort((a, b) => (b.width || 0) - (a.width || 0));
+    return byWidth[0]?.link || pool[0]?.link;
+  }
 
-  function buildImageUrl(photoId) {
-    return `https://images.unsplash.com/${photoId}?w=1920&q=80&fit=crop`;
+  async function getVideoUrlForMood(mood) {
+    const query = mood.trim() || DEFAULT_VIDEO_QUERY;
+    let videos = await fetchPexelsVideos(query);
+    if (!videos.length) videos = await fetchPexelsVideos(DEFAULT_VIDEO_QUERY);
+    if (!videos.length) throw new Error('No videos found');
+    const video = videos[Math.floor(Math.random() * videos.length)];
+    const link = pickBestVideoFile(video);
+    if (!link) throw new Error('No video file');
+    return link;
+  }
+
+  function preloadVideo(url) {
+    return new Promise((resolve, reject) => {
+      const v = document.createElement('video');
+      v.muted = true;
+      v.playsInline = true;
+      v.preload = 'auto';
+      v.oncanplaythrough = () => resolve(url);
+      v.onerror = () => reject(new Error('Video failed to load'));
+      v.src = url;
+    });
   }
 
   // ── Elements ──
@@ -691,12 +726,11 @@
   const inputWrap = document.getElementById('inputWrap');
   const pillsContainer = document.getElementById('pills');
   const blurOverlay = document.getElementById('blurOverlay');
-  const bgA = document.getElementById('bgA');
-  const bgB = document.getElementById('bgB');
+  const bgVideo = document.getElementById('bg-video');
   const loadingBar = document.getElementById('loadingBar');
   const closeBtn = document.getElementById('closeBtn');
 
-  let activeBg = 'A';
+  let defaultVideoUrl = '';
   let currentState = 'entry';
   let currentMood = '';
   let hasTriggeredOnce = false;
@@ -784,57 +818,6 @@
 
   generatePills();
 
-  // ── Preload image ──
-  function preloadImage(url) {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => resolve(url);
-      img.onerror = () => resolve(url);
-      img.src = url;
-    });
-  }
-
-  // ── Get image for mood — collects ALL matching IDs, filters out used, picks random ──
-  function getImageForMood(mood) {
-    const key = mood.toLowerCase().trim();
-    const words = key.split(/\s+/).filter(w => w.length >= 3);
-    let candidates = [];
-
-    // Collect from all matching categories (exact, partial, and word matches)
-    for (const [category, ids] of Object.entries(moodImageIds)) {
-      const isMatch =
-        category === key ||
-        category.includes(key) || key.includes(category) ||
-        words.some(w => category.includes(w));
-
-      if (isMatch) {
-        for (const id of ids) {
-          if (!candidates.includes(id)) candidates.push(id);
-        }
-      }
-    }
-
-    // Fall back to fallback pool if no matches
-    if (candidates.length === 0) {
-      candidates = [...fallbackIds];
-    }
-
-    // Filter out already-used images
-    let fresh = candidates.filter(id => !usedImages.has(id));
-
-    // If all candidates exhausted, clear history for this set and reuse
-    if (fresh.length === 0) {
-      candidates.forEach(id => usedImages.delete(id));
-      fresh = [...candidates];
-    }
-
-    // Pick random from fresh pool
-    const chosen = fresh[Math.floor(Math.random() * fresh.length)];
-    usedImages.add(chosen);
-
-    return buildImageUrl(chosen);
-  }
-
   // ── Loading bar ──
   function showLoading() {
     loadingBar.style.transition = 'none';
@@ -860,20 +843,25 @@
 
     showLoading();
 
-    const imgUrl = getImageForMood(currentMood);
-    await preloadImage(imgUrl);
+    let videoUrl;
+    try {
+      videoUrl = await getVideoUrlForMood(currentMood);
+      await preloadVideo(videoUrl);
+    } catch {
+      videoUrl = defaultVideoUrl || '';
+    }
 
     hideLoading();
 
-    // Crossfade
-    const incoming = activeBg === 'A' ? bgB : bgA;
-    const outgoing = activeBg === 'A' ? bgA : bgB;
-
-    incoming.style.backgroundImage = `url(${imgUrl})`;
-    void incoming.offsetWidth;
-    incoming.classList.add('active');
-    outgoing.classList.remove('active');
-    activeBg = activeBg === 'A' ? 'B' : 'A';
+    if (videoUrl) {
+      bgVideo.style.opacity = '0';
+      setTimeout(() => {
+        bgVideo.src = videoUrl;
+        bgVideo.load();
+        bgVideo.play().catch(() => {});
+        bgVideo.style.opacity = '1';
+      }, 400);
+    }
 
     // Clear blur
     blurOverlay.classList.add('clear');
@@ -936,7 +924,6 @@
     currentMood = '';
     hasTriggeredOnce = false;
     isDisplayMode = false;
-    usedImages.clear();
 
     // Hide close button
     closeBtn.classList.remove('visible');
@@ -960,15 +947,16 @@
     generatePills();
     pillsContainer.classList.remove('hidden');
 
-    // Crossfade back to default image
-    const incoming = activeBg === 'A' ? bgB : bgA;
-    const outgoing = activeBg === 'A' ? bgA : bgB;
-
-    incoming.style.backgroundImage = `url(${defaultBgUrl})`;
-    void incoming.offsetWidth;
-    incoming.classList.add('active');
-    outgoing.classList.remove('active');
-    activeBg = activeBg === 'A' ? 'B' : 'A';
+    // Switch back to default video
+    if (defaultVideoUrl) {
+      bgVideo.style.opacity = '0';
+      setTimeout(() => {
+        bgVideo.src = defaultVideoUrl;
+        bgVideo.load();
+        bgVideo.play().catch(() => {});
+        bgVideo.style.opacity = '1';
+      }, 400);
+    }
 
     // Focus input after transition
     setTimeout(() => {
@@ -994,6 +982,16 @@
     moodInput.value = mood;
     triggerMood(mood);
   });
+
+  // Load default background video on start
+  (async function setDefaultVideo() {
+    try {
+      const url = await getVideoUrlForMood(DEFAULT_VIDEO_QUERY);
+      defaultVideoUrl = url;
+      bgVideo.src = url;
+      bgVideo.play().catch(() => {});
+    } catch (_) {}
+  })();
 
   // Focus on load
   setTimeout(() => {
