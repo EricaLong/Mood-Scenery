@@ -46,12 +46,18 @@
       position: fixed;
       inset: 0;
       z-index: 2;
-      backdrop-filter: blur(40px) saturate(1.2);
-      -webkit-backdrop-filter: blur(40px) saturate(1.2);
-      background: rgba(0, 0, 0, 0.15);
+      backdrop-filter: blur(6px) saturate(1.2);
+      -webkit-backdrop-filter: blur(6px) saturate(1.2);
+      background: rgba(0, 0, 0, 0.3);
       transition: backdrop-filter 2s cubic-bezier(0.4, 0, 0.2, 1),
                   -webkit-backdrop-filter 2s cubic-bezier(0.4, 0, 0.2, 1),
                   background 2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .blur-overlay.editing {
+      backdrop-filter: blur(20px) saturate(1.2);
+      -webkit-backdrop-filter: blur(20px) saturate(1.2);
+      background: rgba(0, 0, 0, 0.4);
     }
 
     .blur-overlay.clear {
@@ -423,11 +429,106 @@
   const PEXELS_VIDEOS_SEARCH = 'https://api.pexels.com/videos/search';
 
   // Fallback search if mood returns no results
-  const DEFAULT_VIDEO_QUERY = 'calm nature';
+  const DEFAULT_VIDEO_QUERY = 'calm nature landscape';
+
+  // ── Mood-to-scenery mapping ──
+  // Translates mood/feeling words into scenery-appropriate search terms
+  // so we always get nature/landscape videos, never literal interpretations.
+  const moodToScenery = {
+    // Direct scenery moods
+    'calm': 'calm lake still water landscape',
+    'peaceful': 'peaceful meadow sunrise landscape',
+    'serene': 'serene mountain lake reflection',
+    'tranquil': 'tranquil river forest morning',
+    'relaxed': 'gentle stream green valley',
+    'cozy': 'warm cabin snow forest winter',
+    'comfort': 'warm sunset rolling hills',
+    'warm': 'golden hour sunset field landscape',
+
+    // Emotional moods → scenery equivalents
+    'happy': 'bright sunny meadow flowers landscape',
+    'joy': 'sunlit field wildflowers spring',
+    'excited': 'dramatic waterfall rushing river canyon',
+    'energetic': 'crashing ocean waves rocky coast',
+    'passionate': 'volcanic landscape dramatic sunset sky',
+    'fiery': 'desert sunset red canyon landscape',
+    'romantic': 'sunset beach golden hour ocean',
+    'romance': 'sunset beach golden hour ocean',
+    'love': 'cherry blossom garden spring scenery',
+    'tender': 'soft morning mist meadow flowers',
+
+    // Melancholy / reflective
+    'sad': 'misty forest rain fog landscape',
+    'melancholy': 'rainy lake overcast mountains',
+    'lonely': 'vast empty desert dunes landscape',
+    'tired': 'peaceful still lake dusk twilight',
+    'exhausted': 'quiet moonlit lake night calm',
+    'nostalgic': 'autumn country road leaves falling',
+    'bittersweet': 'autumn sunset golden trees landscape',
+    'reflective': 'still pond mirror reflection mountains',
+
+    // Intense moods
+    'angry': 'stormy sea dark thunderclouds ocean',
+    'anxious': 'fog rolling hills moody landscape',
+    'stressed': 'dark forest mist mysterious landscape',
+    'intense': 'lightning storm dramatic sky landscape',
+    'stormy': 'storm clouds ocean waves dramatic',
+
+    // Wonder / dreamy
+    'dreamy': 'northern lights aurora night sky',
+    'wonder': 'starry night sky milky way mountains',
+    'mystical': 'misty enchanted forest sunbeams',
+    'cosmic': 'night sky stars milky way landscape',
+    'magical': 'rainbow waterfall misty forest light',
+
+    // Nature-specific
+    'ocean': 'ocean waves aerial coastline',
+    'mountain': 'mountain peaks snow sunrise',
+    'forest': 'deep forest sunlight trees',
+    'rain': 'rain falling forest leaves nature',
+    'snow': 'snowfall winter forest landscape',
+    'autumn': 'autumn forest golden leaves landscape',
+    'spring': 'spring meadow flowers blooming nature',
+    'summer': 'summer beach tropical ocean sunset',
+    'winter': 'winter snow mountains frozen lake',
+    'sunset': 'sunset clouds golden sky landscape',
+    'sunrise': 'sunrise mountains morning light landscape',
+
+    // Freedom / adventure
+    'free': 'open sky vast plains landscape',
+    'freedom': 'soaring over mountains aerial landscape',
+    'adventure': 'mountain trail wilderness landscape',
+    'wanderlust': 'winding road through mountains landscape',
+    'wild': 'untamed wilderness rugged landscape',
+
+    // Stillness / spiritual
+    'still': 'still water glass lake mountains',
+    'quiet': 'quiet forest morning dew nature',
+    'hope': 'sunrise breaking through clouds landscape',
+    'grateful': 'golden sunset over calm ocean',
+    'mindful': 'zen garden peaceful water stones nature',
+    'spiritual': 'sunbeams through ancient forest cathedral',
+  };
+
+  // Convert any mood input into a scenery-focused search query
+  function moodToSceneryQuery(mood) {
+    const lower = mood.toLowerCase().trim();
+
+    // Check for exact match
+    if (moodToScenery[lower]) return moodToScenery[lower];
+
+    // Check if any key is contained in the mood phrase
+    for (const [key, scenery] of Object.entries(moodToScenery)) {
+      if (lower.includes(key) || key.includes(lower)) return scenery;
+    }
+
+    // Fallback: append "nature landscape scenery" to force scenery results
+    return `${lower} nature landscape scenery`;
+  }
 
   // ── Pexels: fetch videos and pick best file for background (landscape, HD when possible) ──
   async function fetchPexelsVideos(query) {
-    const url = `${PEXELS_VIDEOS_SEARCH}?query=${encodeURIComponent(query)}&per_page=15`;
+    const url = `${PEXELS_VIDEOS_SEARCH}?query=${encodeURIComponent(query)}&per_page=15&orientation=landscape`;
     const res = await fetch(url, { headers: { Authorization: PEXELS_API_KEY } });
     if (!res.ok) throw new Error('Pexels request failed');
     const data = await res.json();
@@ -443,7 +544,7 @@
   }
 
   async function getVideoUrlForMood(mood) {
-    const query = mood.trim() || DEFAULT_VIDEO_QUERY;
+    const query = moodToSceneryQuery(mood) || DEFAULT_VIDEO_QUERY;
     let videos = await fetchPexelsVideos(query);
     if (!videos.length) videos = await fetchPexelsVideos(DEFAULT_VIDEO_QUERY);
     if (!videos.length) throw new Error('No videos found');
@@ -610,6 +711,7 @@
     }
 
     // Clear blur
+    blurOverlay.classList.remove('editing');
     blurOverlay.classList.add('clear');
 
     // Move to top
@@ -634,8 +736,9 @@
     currentState = 'editing';
     isDisplayMode = false;
 
-    // Blur background
+    // Blur background more while editing
     blurOverlay.classList.remove('clear');
+    blurOverlay.classList.add('editing');
 
     // Keep at top after first trigger
     if (hasTriggeredOnce) {
@@ -674,8 +777,9 @@
     // Hide close button
     closeBtn.classList.remove('visible');
 
-    // Restore blur
+    // Restore homepage blur (light, scenery visible)
     blurOverlay.classList.remove('clear');
+    blurOverlay.classList.remove('editing');
 
     // Move prompt back to center
     promptContainer.classList.remove('at-top');
@@ -729,10 +833,35 @@
     triggerMood(mood);
   });
 
-  // Load default background video on start
+  // ── Random scenery queries for homepage variety ──
+  const homepageQueries = [
+    'aerial ocean coastline waves',
+    'mountain sunrise golden light',
+    'northern lights aurora borealis',
+    'tropical beach turquoise water',
+    'autumn forest golden leaves',
+    'snow falling pine trees winter',
+    'desert sand dunes sunset',
+    'waterfall jungle rainforest',
+    'lavender field provence',
+    'cherry blossom spring garden',
+    'misty mountain valley fog',
+    'coral reef underwater ocean',
+    'rolling green hills countryside',
+    'starry night sky timelapse',
+    'glacier ice landscape arctic',
+    'river flowing through canyon',
+    'sunrise clouds aerial above',
+    'bamboo forest wind peaceful',
+    'volcanic landscape lava glow',
+    'calm lake reflection sunset',
+  ];
+
+  // Load a random scenery video on start
   (async function setDefaultVideo() {
     try {
-      const url = await getVideoUrlForMood(DEFAULT_VIDEO_QUERY);
+      const randomQuery = homepageQueries[Math.floor(Math.random() * homepageQueries.length)];
+      const url = await getVideoUrlForMood(randomQuery);
       defaultVideoUrl = url;
       bgVideo.src = url;
       bgVideo.play().catch(() => {});
